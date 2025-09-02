@@ -1,0 +1,71 @@
+{
+  "name": "olx-mcp",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "build:watch": "tsc --watch",
+    "dev": "tsx src/index.ts",
+    "start": "node dist/index.js",
+    "test": "vitest",
+    "test:watch": "vitest --watch",
+    "test:coverage": "vitest --coverage",
+    "test:ui": "vitest --ui",
+    "lint": "eslint src tests --ext .ts",
+    "lint:fix": "eslint src tests --ext .ts --fix",
+    "format": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\"",
+    "format:check": "prettier --check \"src/**/*.ts\" \"tests/**/*.ts\"",
+    "type-check": "tsc --noEmit",
+    "clean": "rm -rf dist coverage .tsbuildinfo",
+    "ci": "npm run lint && npm run type-check && npm run test:coverage && npm run build",
+    "test:unit": "vitest src/core/types.test.ts src/core/tool-registry.test.ts",
+    "test:tools": "vitest src/tools/",
+    "test:working": "vitest --exclude \"**/server.test.ts\" --exclude \"**/olx-pt.scraper.test.ts\"",
+    "test:coverage:working": "vitest --coverage --exclude \"**/server.test.ts\" --exclude \"**/olx-pt.scraper.test.ts\"",
+    "prepare": "husky install"
+  },
+  "keywords": [
+    "mcp",
+    "olx",
+    "scraper",
+    "claude",
+    "model-context-protocol"
+  ],
+  "author": "Łukasz Margiela",
+  "license": "MIT",
+  "description": "OLX MCP server that enables Claude Desktop to browse and search OLX listings across multiple domains (PT, PL, BG, RO, UA)",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/l-margiela/olx-mcp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/l-margiela/olx-mcp/issues"
+  },
+  "homepage": "https://github.com/l-margiela/olx-mcp#readme",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.17.4",
+    "playwright": "^1.55.0",
+    "zod": "^3.25.76",
+    "zod-to-json-schema": "^3.24.6"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.34.0",
+    "@types/node": "^24.3.0",
+    "@typescript-eslint/eslint-plugin": "^8.41.0",
+    "@typescript-eslint/parser": "^8.41.0",
+    "@vitest/coverage-v8": "^3.2.4",
+    "eslint": "^9.34.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-import": "^2.32.0",
+    "eslint-plugin-node": "^11.1.0",
+    "eslint-plugin-promise": "^7.2.1",
+    "eslint-plugin-unicorn": "^60.0.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.1.6",
+    "prettier": "^3.6.2",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  }
+}

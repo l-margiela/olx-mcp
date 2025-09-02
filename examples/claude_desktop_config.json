@@ -1,0 +1,42 @@
+{
+  "mcpServers": {
+    "olx-mcp": {
+      "command": "node",
+      "args": [
+        "/path/to/your/olx-mcp/dist/index.js"
+      ],
+      "env": {
+        "NODE_ENV": "production"
+      }
+    }
+  }
+}
+
+// Alternative configuration using npx (for development):
+// {
+//   "mcpServers": {
+//     "olx-mcp": {
+//       "command": "npx",
+//       "args": [
+//         "tsx",
+//         "/path/to/your/olx-mcp/src/index.ts"
+//       ],
+//       "env": {
+//         "NODE_ENV": "development"
+//       }
+//     }
+//   }
+// }
+
+// Alternative configuration using npm run (if installed globally):
+// {
+//   "mcpServers": {
+//     "olx-mcp": {
+//       "command": "npm",
+//       "args": [
+//         "start"
+//       ],
+//       "cwd": "/path/to/your/olx-mcp"
+//     }
+//   }
+// }
