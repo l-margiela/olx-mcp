@@ -1,6 +1,6 @@
 # OLX MCP Server
 
-Why search for electro-trash in your area by yourself if Claude can do it for you?
+Why search for e-waste in your area by yourself if Claude can do it for you?
 
 100% AI slop.
 
