@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/l-margiela-olx-mcp-badge.png)](https://mseep.ai/app/l-margiela-olx-mcp)
+
 # OLX MCP Server
 
 Why search for electro-trash in your area by yourself if Claude can do it for you?
