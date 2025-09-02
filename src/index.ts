@@ -1,18 +1,28 @@
 #!/usr/bin/env node
 
+import { readFileSync } from 'fs';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { OLXMCPServer } from './core/server.js';
 
+// Get version from package.json
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const packageJsonPath = join(__dirname, '..', 'package.json');
+const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf8'));
+const version = packageJson.version;
+
 // Handle --version flag
 if (process.argv.includes('--version') || process.argv.includes('-v')) {
-  console.log('1.0.0');
+  console.log(version);
   process.exit(0);
 }
 
 // Handle --help flag
 if (process.argv.includes('--help') || process.argv.includes('-h')) {
   console.log(`
-OLX MCP Server v1.0.0
+OLX MCP Server v${version}
 A Model Context Protocol server for searching OLX listings across Europe.
 
 Usage: olx-mcp
@@ -36,7 +46,7 @@ Supports domains: olx.pt, olx.pl, olx.bg, olx.ro, olx.ua
 async function main() {
   const server = new OLXMCPServer({
     name: 'olx-mcp-server',
-    version: '1.0.0',
+    version: version,
     headless: true,
   });
 
