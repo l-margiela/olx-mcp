@@ -33,7 +33,10 @@ jobs:
         run: npm run ci
 
       - name: Create package
-        run: npm pack
+        id: package
+        run: |
+          PACKAGE_FILE=$(npm pack)
+          echo "package-file=$PACKAGE_FILE" >> $GITHUB_OUTPUT
 
       - name: Publish to npm
         run: npm publish --provenance --access public
@@ -41,15 +44,9 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Create GitHub Release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: softprops/action-gh-release@v1
         with:
-          tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref }}
-          draft: false
-          prerelease: false
+          files: ./${{ steps.package.outputs.package-file }}
           body: |
             ## Installation
 
@@ -76,16 +73,6 @@ jobs:
             - See commit history for detailed changes
             - Fully compatible with Claude Desktop
             - Supports all 5 OLX domains (PT, PL, BG, RO, UA)
-
-      - name: Upload package as release asset
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./olx-mcp-1.0.0.tgz
-          asset_name: olx-mcp-1.0.0.tgz
-          asset_content_type: application/gzip
 
   # Run package locally before publishing
   test-package:
