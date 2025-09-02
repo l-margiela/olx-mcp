@@ -11,6 +11,8 @@ Why search for electro-trash in your area by yourself if Claude can do it for yo
 - 📋 **Listing Details**: Get detailed information about specific listings including seller info
 - 🎭 **Browser Automation**: Reliable web scraping using Playwright
 
+<img width="739" height="858" alt="Screenshot 2025-09-02 at 22 47 54" src="https://github.com/user-attachments/assets/c6fee7a4-fa84-4ca5-9eb0-7dc8a1ed6c58" />
+
 ## Installation
 
 ### 🚀 Quick Install (Recommended)
