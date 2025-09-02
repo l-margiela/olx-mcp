@@ -10,7 +10,10 @@
       "Bash(npm run type-check:*)",
       "Bash(npm run lint)",
       "Bash(npm run format:*)",
-      "Bash(npm run clean:*)"
+      "Bash(npm run clean:*)",
+      "Bash(gh run watch:*)",
+      "Bash(gh run list:*)",
+      "Bash(npm pack:*)"
     ],
     "deny": [],
     "ask": []
