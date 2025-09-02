@@ -3,6 +3,18 @@
   "version": "1.0.0",
   "type": "module",
   "main": "dist/index.js",
+  "bin": {
+    "olx-mcp": "dist/index.js"
+  },
+  "files": [
+    "dist/**/*",
+    "README.md",
+    "LICENSE",
+    "examples/*"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "scripts": {
     "build": "tsc",
     "build:watch": "tsc --watch",
@@ -23,15 +35,25 @@
     "test:tools": "vitest src/tools/",
     "test:working": "vitest --exclude \"**/server.test.ts\" --exclude \"**/olx-pt.scraper.test.ts\"",
     "test:coverage:working": "vitest --coverage --exclude \"**/server.test.ts\" --exclude \"**/olx-pt.scraper.test.ts\"",
-    "prepare": "husky install"
+    "prepare": "husky install",
+    "prepublishOnly": "npm run ci",
+    "postpack": "echo '✅ Package created successfully! Install with: npm install -g olx-mcp'"
   },
   "keywords": [
     "mcp",
     "olx",
     "scraper",
     "claude",
-    "model-context-protocol"
+    "model-context-protocol",
+    "web-scraping",
+    "marketplace",
+    "europe",
+    "portugal",
+    "poland"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "author": "Łukasz Margiela",
   "license": "MIT",
   "description": "OLX MCP server that enables Claude Desktop to browse and search OLX listings across multiple domains (PT, PL, BG, RO, UA)",

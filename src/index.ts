@@ -3,6 +3,36 @@
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { OLXMCPServer } from './core/server.js';
 
+// Handle --version flag
+if (process.argv.includes('--version') || process.argv.includes('-v')) {
+  console.log('1.0.0');
+  process.exit(0);
+}
+
+// Handle --help flag
+if (process.argv.includes('--help') || process.argv.includes('-h')) {
+  console.log(`
+OLX MCP Server v1.0.0
+A Model Context Protocol server for searching OLX listings across Europe.
+
+Usage: olx-mcp
+
+This server is designed to be used with Claude Desktop.
+Configure it in your claude_desktop_config.json:
+
+{
+  "mcpServers": {
+    "olx-mcp": {
+      "command": "olx-mcp"
+    }
+  }
+}
+
+Supports domains: olx.pt, olx.pl, olx.bg, olx.ro, olx.ua
+  `);
+  process.exit(0);
+}
+
 async function main() {
   const server = new OLXMCPServer({
     name: 'olx-mcp-server',

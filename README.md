@@ -11,7 +11,28 @@ Why search for electro-trash in your area by yourself if Claude can do it for yo
 - 📋 **Listing Details**: Get detailed information about specific listings including seller info
 - 🎭 **Browser Automation**: Reliable web scraping using Playwright
 
-## Setup
+## Installation
+
+### 🚀 Quick Install (Recommended)
+
+```bash
+npm install -g olx-mcp
+```
+
+### 📦 Alternative: From Source
+
+```bash
+git clone https://github.com/l-margiela/olx-mcp.git
+cd olx-mcp
+npm install
+npm run build
+```
+
+### ✅ Verify Installation
+
+```bash
+olx-mcp --version
+```
 
 ## Claude Desktop Configuration
 
@@ -23,6 +44,18 @@ Why search for electro-trash in your area by yourself if Claude can do it for yo
 
 2. **Add the OLX MCP server to your configuration:**
 
+**For npm installation:**
+```json
+{
+  "mcpServers": {
+    "olx-mcp": {
+      "command": "olx-mcp"
+    }
+  }
+}
+```
+
+**For source installation:**
 ```json
 {
   "mcpServers": {
@@ -37,7 +70,7 @@ Why search for electro-trash in your area by yourself if Claude can do it for yo
 }
 ```
 
-**Note**: Replace `/absolute/path/to/olx-mcp` with the actual path to your project directory.
+**Note**: For source installation, replace `/absolute/path/to/olx-mcp` with the actual path to your project directory.
 
 3. **Restart Claude Desktop** to load the new configuration.
 
