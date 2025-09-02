@@ -35,7 +35,7 @@ jobs:
       - name: Create package
         id: package
         run: |
-          PACKAGE_FILE=$(npm pack)
+          PACKAGE_FILE=$(npm pack --silent | tail -n1)
           echo "package-file=$PACKAGE_FILE" >> $GITHUB_OUTPUT
 
       - name: Publish to npm
