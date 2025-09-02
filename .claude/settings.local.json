@@ -13,7 +13,9 @@
       "Bash(npm run clean:*)",
       "Bash(gh run watch:*)",
       "Bash(gh run list:*)",
-      "Bash(npm pack:*)"
+      "Bash(npm pack:*)",
+      "Bash(gh run view:*)",
+      "Bash(olx-mcp:*)"
     ],
     "deny": [],
     "ask": []
