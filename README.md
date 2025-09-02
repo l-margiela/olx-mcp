@@ -1,6 +1,8 @@
 # OLX MCP Server
 
-A Model Context Protocol (MCP) server that enables Claude Desktop to browse and search OLX listings across 5 European domains. Built with TypeScript, Playwright, and the latest MCP SDK patterns.
+Why search for electro-trash in your area by yourself if Claude can do it for you?
+
+100% AI slop.
 
 ## Features
 
@@ -9,36 +11,9 @@ A Model Context Protocol (MCP) server that enables Claude Desktop to browse and 
 - 📋 **Listing Details**: Get detailed information about specific listings including seller info
 - 🎭 **Browser Automation**: Reliable web scraping using Playwright
 
-## Installation
+## Setup
 
-### Prerequisites
-
-- Node.js 18+ (LTS)
-- npm or yarn
-
-### Setup
-
-1. **Clone and install dependencies:**
-
-```bash
-git clone https://github.com/l-margiela/olx-mcp.git
-cd olx-mcp
-npm install
-```
-
-2. **Build the project:**
-
-```bash
-npm run build
-```
-
-3. **Test the server (optional):**
-
-```bash
-npm run dev
-```
-
-### Claude Desktop Configuration
+## Claude Desktop Configuration
 
 1. **Locate your Claude Desktop config file:**
 
