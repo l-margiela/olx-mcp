@@ -4,9 +4,10 @@
   "type": "module",
   "main": "dist/index.js",
   "bin": {
-    "olx-mcp": "dist/index.js"
+    "olx-mcp": "bin/olx-mcp-wrapper.js"
   },
   "files": [
+    "bin/**/*",
     "dist/**/*",
     "package.json",
     "README.md",
@@ -37,7 +38,7 @@
     "test:working": "vitest --exclude \"**/server.test.ts\" --exclude \"**/olx-pt.scraper.test.ts\" --exclude \"**/olx-pl.scraper.test.ts\"",
     "test:coverage:working": "vitest --coverage --exclude \"**/server.test.ts\" --exclude \"**/olx-pt.scraper.test.ts\" --exclude \"**/olx-pl.scraper.test.ts\"",
     "prepare": "husky install",
-    "postinstall": "playwright install --with-deps",
+    "postinstall": "playwright install chromium --with-deps || echo 'Playwright browsers will be installed on first use'",
     "prepublishOnly": "npm run ci",
     "postpack": "echo '✅ Package created successfully! Install with: npm install -g olx-mcp'"
   },
