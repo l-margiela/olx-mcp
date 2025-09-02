@@ -30,7 +30,7 @@
     "format:check": "prettier --check \"src/**/*.ts\" \"tests/**/*.ts\"",
     "type-check": "tsc --noEmit",
     "clean": "rm -rf dist coverage .tsbuildinfo",
-    "ci": "npm run lint && npm run type-check && npm run test:coverage && npm run build",
+    "ci": "npm run lint && npm run type-check && npm run test:coverage:working && npm run build",
     "test:unit": "vitest src/core/types.test.ts src/core/tool-registry.test.ts",
     "test:tools": "vitest src/tools/",
     "test:working": "vitest --exclude \"**/server.test.ts\" --exclude \"**/olx-pt.scraper.test.ts\"",

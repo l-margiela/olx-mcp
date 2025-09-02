@@ -108,7 +108,7 @@ jobs:
 
       - name: Build and pack
         run: |
-          npm run build
+          npm run ci
           npm pack
 
       - name: Test global installation
