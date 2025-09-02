@@ -33,8 +33,8 @@
     "ci": "npm run lint && npm run type-check && npm run test:coverage:working && npm run build",
     "test:unit": "vitest src/core/types.test.ts src/core/tool-registry.test.ts",
     "test:tools": "vitest src/tools/",
-    "test:working": "vitest --exclude \"**/server.test.ts\" --exclude \"**/olx-pt.scraper.test.ts\"",
-    "test:coverage:working": "vitest --coverage --exclude \"**/server.test.ts\" --exclude \"**/olx-pt.scraper.test.ts\"",
+    "test:working": "vitest --exclude \"**/server.test.ts\" --exclude \"**/olx-pt.scraper.test.ts\" --exclude \"**/olx-pl.scraper.test.ts\"",
+    "test:coverage:working": "vitest --coverage --exclude \"**/server.test.ts\" --exclude \"**/olx-pt.scraper.test.ts\" --exclude \"**/olx-pl.scraper.test.ts\"",
     "prepare": "husky install",
     "prepublishOnly": "npm run ci",
     "postpack": "echo '✅ Package created successfully! Install with: npm install -g olx-mcp'"
