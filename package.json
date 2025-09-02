@@ -37,6 +37,7 @@
     "test:working": "vitest --exclude \"**/server.test.ts\" --exclude \"**/olx-pt.scraper.test.ts\" --exclude \"**/olx-pl.scraper.test.ts\"",
     "test:coverage:working": "vitest --coverage --exclude \"**/server.test.ts\" --exclude \"**/olx-pt.scraper.test.ts\" --exclude \"**/olx-pl.scraper.test.ts\"",
     "prepare": "husky install",
+    "postinstall": "playwright install --with-deps",
     "prepublishOnly": "npm run ci",
     "postpack": "echo '✅ Package created successfully! Install with: npm install -g olx-mcp'"
   },
