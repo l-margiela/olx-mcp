@@ -55,8 +55,11 @@ describe('OLXPLScraper', () => {
   });
 
   describe('Search functionality', () => {
-    it('should perform basic search with Polish domain', async () => {
+    beforeEach(() => {
       setupOLXScrapingMocks();
+    });
+
+    it('should perform basic search with Polish domain', async () => {
       const filters = createMockSearchFilters({
         domain: 'olx.pl',
         query: 'telefon',
@@ -152,8 +155,11 @@ describe('OLXPLScraper', () => {
   });
 
   describe('Listing details functionality', () => {
-    it('should get listing details for Polish domain', async () => {
+    beforeEach(() => {
       setupOLXScrapingMocks();
+    });
+
+    it('should get listing details for Polish domain', async () => {
       const listingId = 'Xyz123' as ListingId;
 
       const result = await scraper.getListingDetails(listingId);
@@ -165,7 +171,6 @@ describe('OLXPLScraper', () => {
     });
 
     it('should find listing URL through Polish search path', async () => {
-      setupOLXScrapingMocks();
       const listingId = 'TestId123' as ListingId;
 
       // This calls the protected method indirectly through getListingDetails

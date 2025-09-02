@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "Bash(npm init:*)",
+      "Bash(npm install:*)",
+      "Bash(npm run build:*)",
+      "Bash(timeout 10s npm run dev)",
+      "Bash(npm run test:*)",
+      "Bash(npm run type-check:*)",
+      "Bash(npm run lint)",
+      "Bash(npm run format:*)",
+      "Bash(npm run clean:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

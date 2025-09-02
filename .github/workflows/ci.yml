@@ -37,7 +37,7 @@ jobs:
       run: npm run type-check
 
     - name: Run stable tests
-      run: npm run test:working
+      run: npm run test:unit && npm run test:tools
 
     - name: Run build
       run: npm run build
