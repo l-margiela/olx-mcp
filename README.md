@@ -15,28 +15,7 @@ Why search for e-waste in your area by yourself if Claude can do it for you?
 
 ## Installation
 
-### 🚀 Quick Install (Recommended)
-
-```bash
-npm install -g olx-mcp
-```
-
-### 📦 Alternative: From Source
-
-```bash
-git clone https://github.com/l-margiela/olx-mcp.git
-cd olx-mcp
-npm install
-npm run build
-```
-
-### ✅ Verify Installation
-
-```bash
-olx-mcp --version
-```
-
-## Claude Desktop Configuration
+### 📋 Claude Desktop Configuration
 
 1. **Locate your Claude Desktop config file:**
 
@@ -46,7 +25,28 @@ olx-mcp --version
 
 2. **Add the OLX MCP server to your configuration:**
 
-**For npm installation:**
+```json
+{
+  "mcpServers": {
+    "olx-mcp": {
+      "command": "npx",
+      "args": ["olx-mcp"]
+    }
+  }
+}
+```
+
+3. **Restart Claude Desktop** to load the new configuration.
+
+### 🔄 Alternative: Global Installation
+
+If you prefer to install globally:
+
+```bash
+npm install -g olx-mcp
+```
+
+Then use this config:
 ```json
 {
   "mcpServers": {
@@ -57,24 +57,26 @@ olx-mcp --version
 }
 ```
 
-**For source installation:**
+### 📦 Development: From Source
+
+```bash
+git clone https://github.com/l-margiela/olx-mcp.git
+cd olx-mcp
+npm install
+npm run build
+```
+
+Use this config for development:
 ```json
 {
   "mcpServers": {
     "olx-mcp": {
       "command": "node",
-      "args": ["/absolute/path/to/olx-mcp/dist/index.js"],
-      "env": {
-        "NODE_ENV": "production"
-      }
+      "args": ["/absolute/path/to/olx-mcp/dist/index.js"]
     }
   }
 }
 ```
-
-**Note**: For source installation, replace `/absolute/path/to/olx-mcp` with the actual path to your project directory.
-
-3. **Restart Claude Desktop** to load the new configuration.
 
 ## Usage
 
