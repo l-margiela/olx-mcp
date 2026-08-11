@@ -110,6 +110,7 @@ export interface MockPage {
   $: MockedFunction<Page['$']>;
   $$: MockedFunction<Page['$$']>;
   $eval: MockedFunction<Page['$eval']>;
+  $$eval: MockedFunction<Page['$$eval']>;
   waitForSelector: MockedFunction<Page['waitForSelector']>;
   close: MockedFunction<Page['close']>;
   url: MockedFunction<() => string>;
@@ -142,9 +143,12 @@ export const createMockElementHandle = (
 export const createMockPage = (overrides: Partial<MockPage> = {}): MockPage =>
   ({
     goto: vi.fn().mockResolvedValue(undefined),
-    $: vi.fn(),
+    // Defaults mirror a page where nothing matches, so callers always get a
+    // promise back rather than undefined.
+    $: vi.fn().mockResolvedValue(null),
     $$: vi.fn().mockResolvedValue([]),
-    $eval: vi.fn(),
+    $eval: vi.fn().mockRejectedValue(new Error('No element matches selector')),
+    $$eval: vi.fn().mockResolvedValue([]),
     waitForSelector: vi.fn().mockResolvedValue(createMockElementHandle()),
     close: vi.fn().mockResolvedValue(undefined),
     url: vi.fn().mockReturnValue('https://olx.pt'),

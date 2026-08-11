@@ -6,16 +6,6 @@ export interface IScraper<TQuery, TResult> {
   validateQuery(query: unknown): query is TQuery;
 }
 
-export interface IScraperFactory {
-  createListingScraper(): IListingScraper;
-  createDetailsScraper(): IDetailsScraper;
-  createCategoryScraper(): ICategoryScraper;
-}
-
-export interface IListingScraper extends IScraper<any, any> {}
-export interface IDetailsScraper extends IScraper<any, any> {}
-export interface ICategoryScraper extends IScraper<any, any> {}
-
 export abstract class PlaywrightScraper<TQuery, TResult> implements IScraper<TQuery, TResult> {
   constructor(
     protected readonly config: ScraperConfig,

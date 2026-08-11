@@ -59,7 +59,7 @@ export abstract class BaseOlxScraper extends PlaywrightScraper<SearchFilters, Se
         throw new Error('Operation cancelled');
       }
 
-      const listings = await this.extractListings(page);
+      const listings = await this.extractListings(page, filters.limit);
       const pagination = await this.extractPaginationInfo(page, filters.page || 1);
 
       return {
@@ -110,68 +110,98 @@ export abstract class BaseOlxScraper extends PlaywrightScraper<SearchFilters, Se
   }
 
   private async waitForSearchResults(page: Page): Promise<void> {
-    try {
-      await Promise.race([
-        page.waitForSelector(this.domainConfig.selectors.search.listingCard, { timeout: 10000 }),
-        page.waitForSelector(this.domainConfig.selectors.search.noResults, { timeout: 10000 }),
-      ]);
-    } catch {
-      // Continue even if selectors don't appear - might be an empty result
-    }
+    // Racing this against an empty-state selector left the losing wait pending
+    // and rejecting unobserved. Cards never appearing is not an error here —
+    // extractListings is what distinguishes an empty page from a broken one.
+    await page
+      .waitForSelector(this.domainConfig.selectors.search.listingCard, { timeout: 10000 })
+      .catch(() => {});
   }
 
-  private async extractListings(page: Page): Promise<Listing[]> {
-    const listingElements = await page.$$(this.domainConfig.selectors.search.listingCard);
+  private async extractListings(page: Page, limit?: number): Promise<Listing[]> {
+    const { listingCard, title, price, location, image, link } = this.domainConfig.selectors.search;
+
+    // One round-trip for the whole page. Reading each field per card over
+    // separate $eval calls cost ~5 calls x ~50 cards of browser IPC per search.
+    const cards = await page.$$eval(
+      listingCard,
+      (elements, selectors) =>
+        elements.map(card => {
+          const readText = (selector: string) =>
+            card.querySelector(selector)?.textContent?.trim() || '';
+
+          const priceElement = card.querySelector(selectors.price);
+          const readPrice = () => {
+            if (!priceElement) return '';
+            // The amount is the element's own text; its children are injected
+            // <style> tags and <span> labels for the negotiable flag ("do
+            // negocjacji", "Negociavel", ...) that textContent would append to
+            // the amount. Reading direct text nodes keeps this
+            // language-independent.
+            const ownText = Array.from(priceElement.childNodes)
+              .filter(node => node.nodeType === 3)
+              .map(node => node.textContent || '')
+              .join('')
+              .trim();
+            if (ownText) return ownText;
+
+            // No direct text node means the markup changed shape; fall back to
+            // everything except the injected stylesheets.
+            return Array.from(priceElement.childNodes)
+              .filter(node => {
+                const tag = node.nodeName.toLowerCase();
+                return tag !== 'style' && tag !== 'script';
+              })
+              .map(node => node.textContent || '')
+              .join('')
+              .trim();
+          };
+
+          const imageElement = card.querySelector(selectors.image);
+
+          return {
+            title: readText(selectors.title),
+            price: readPrice(),
+            location: readText(selectors.location),
+            imageUrl:
+              imageElement?.getAttribute('src') || imageElement?.getAttribute('data-src') || '',
+            relativeUrl: card.querySelector(selectors.link)?.getAttribute('href') || '',
+          };
+        }),
+      { title, price, location, image, link }
+    );
+
     const listings: Listing[] = [];
+    for (const card of cards) {
+      // A listing without these two is not addressable, so it cannot be returned.
+      if (!card.title || !card.relativeUrl) continue;
 
-    for (const element of listingElements) {
-      try {
-        const title = await element
-          .$eval(this.domainConfig.selectors.search.title, el => el.textContent?.trim() || '')
-          .catch(() => '');
+      const url = new URL(card.relativeUrl, this.domainConfig.baseUrl).toString();
+      const id = this.extractListingId(card.relativeUrl);
 
-        const price = await element
-          .$eval(this.domainConfig.selectors.search.price, el => el.textContent?.trim() || '')
-          .catch(() => '');
-        const finalPrice = price || undefined;
+      // Cache the URL so getListingDetails can skip the lookup search.
+      this.urlCache.set(id, url);
 
-        const location = await element
-          .$eval(this.domainConfig.selectors.search.location, el => el.textContent?.trim() || '')
-          .catch(() => '');
-        const finalLocation = location || undefined;
+      listings.push({
+        id,
+        title: card.title,
+        price: card.price || undefined,
+        location: card.location || undefined,
+        imageUrl: card.imageUrl || undefined,
+        url,
+      });
 
-        const imageUrl = await element
-          .$eval(
-            this.domainConfig.selectors.search.image,
-            el => el.getAttribute('src') || el.getAttribute('data-src') || ''
-          )
-          .catch(() => '');
-        const finalImageUrl = imageUrl || undefined;
+      if (limit !== undefined && listings.length >= limit) break;
+    }
 
-        const relativeUrl = await element
-          .$eval(this.domainConfig.selectors.search.link, el => el.getAttribute('href') || '')
-          .catch(() => '');
-
-        if (!title || !relativeUrl) continue;
-
-        const url = new URL(relativeUrl, this.domainConfig.baseUrl).toString();
-        const id = this.extractListingId(relativeUrl);
-
-        // Cache the URL for this listing ID
-        this.urlCache.set(id, url);
-
-        listings.push({
-          id,
-          title,
-          price: finalPrice,
-          location: finalLocation,
-          imageUrl: finalImageUrl,
-          url,
-        });
-      } catch {
-        // Skip invalid listings
-        continue;
-      }
+    // Cards on the page but none parsed means our selectors no longer match the
+    // markup. Returning [] here would be indistinguishable from a search that
+    // genuinely found nothing, which is how stale selectors ship unnoticed.
+    if (cards.length > 0 && listings.length === 0) {
+      throw new Error(
+        `Found ${cards.length} listing cards on ${this.domainConfig.domain} but extracted none — ` +
+          `the "${title}" or "${link}" selector is likely stale.`
+      );
     }
 
     return listings;
@@ -201,7 +231,11 @@ export abstract class BaseOlxScraper extends PlaywrightScraper<SearchFilters, Se
     };
   }
 
-  protected abstract extractListingId(url: string): ListingId;
+  /** Every domain encodes the id the same way: .../slug-ID<id>.html */
+  protected extractListingId(url: string): ListingId {
+    const match = url.match(/ID([A-Za-z0-9]+)\.html/);
+    return (match?.[1] ?? Date.now().toString()) as ListingId;
+  }
 
   async getListingDetails(listingId: ListingId, signal?: AbortSignal): Promise<Result<Listing>> {
     try {
@@ -243,27 +277,14 @@ export abstract class BaseOlxScraper extends PlaywrightScraper<SearchFilters, Se
         throw new Error('Operation cancelled');
       }
 
-      // Extract listing details
-      const title = await page
-        .$eval(this.domainConfig.selectors.detail.title, el => el.textContent?.trim() || '')
-        .catch(() => '');
-
-      const priceText = await page
-        .$eval(this.domainConfig.selectors.detail.price, el => el.textContent?.trim() || '')
-        .catch(() => '');
-      const price = priceText || undefined;
-
-      const descriptionText = await page
-        .$eval(this.domainConfig.selectors.detail.description, el => el.textContent?.trim() || '')
-        .catch(() => '');
-      const description = descriptionText || undefined;
-
-      const locationText = await page
-        .$eval(this.domainConfig.selectors.detail.location, el => el.textContent?.trim() || '')
-        .catch(() => '');
-      const location = locationText || undefined;
-
-      const seller = await this.extractSellerInfo(page);
+      const detail = this.domainConfig.selectors.detail;
+      const [title, price, description, location, seller] = await Promise.all([
+        readText(page, detail.title),
+        readOptionalText(page, detail.price),
+        readOptionalText(page, detail.description),
+        readOptionalText(page, detail.location),
+        this.extractSellerInfo(page),
+      ]);
 
       return {
         id: listingId,
@@ -277,16 +298,54 @@ export abstract class BaseOlxScraper extends PlaywrightScraper<SearchFilters, Se
     }, signal);
   }
 
-  protected abstract findListingUrl(listingId: ListingId, page: Page): Promise<string>;
+  /**
+   * Fallback for an id that was never seen by a search: look it up through the
+   * domain's own listing search. The id is appended raw because it is
+   * case-sensitive and must not be slugified.
+   */
+  protected async findListingUrl(listingId: ListingId, page: Page): Promise<string> {
+    const listingPath = this.domainConfig.urlPatterns.searchPath();
+
+    try {
+      await page.goto(`${this.domainConfig.baseUrl}${listingPath}q-${listingId}/`, {
+        waitUntil: 'networkidle',
+        timeout: 15000,
+      });
+
+      const href = await page
+        .$eval(
+          `${this.domainConfig.selectors.search.listingCard} a[href*="ID${listingId}"]`,
+          el => el.getAttribute('href') || ''
+        )
+        .catch(() => '');
+
+      if (href) {
+        return new URL(href, this.domainConfig.baseUrl).toString();
+      }
+    } catch {
+      // Fall through: an unreachable search page just means no URL was found.
+    }
+
+    return '';
+  }
 
   private async extractSellerInfo(page: Page) {
-    const nameText = await page
-      .$eval(this.domainConfig.selectors.detail.seller.name, el => el.textContent?.trim() || '')
-      .catch(() => '');
-    const name = nameText || undefined;
+    const seller = this.domainConfig.selectors.detail.seller;
+    const [name, verified] = await Promise.all([
+      readOptionalText(page, seller.name),
+      page.$(seller.verified).then(element => element !== null),
+    ]);
 
-    const verified = (await page.$(this.domainConfig.selectors.detail.seller.verified)) !== null;
-
+    // Reads like the classic precedence trap but is not one: `||` binds tighter,
+    // so this is (name || verified) ? ... — a seller is reported if either is known.
     return name || verified ? { name, verified } : undefined;
   }
 }
+
+/** Text of the first match, or '' when the selector matches nothing. */
+const readText = (page: Page, selector: string): Promise<string> =>
+  page.$eval(selector, el => el.textContent?.trim() || '').catch(() => '');
+
+/** As readText, but absent fields collapse to undefined rather than ''. */
+const readOptionalText = async (page: Page, selector: string): Promise<string | undefined> =>
+  (await readText(page, selector)) || undefined;

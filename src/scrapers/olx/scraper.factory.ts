@@ -62,42 +62,9 @@ export class OlxScraperFactory {
   }
 }
 
-// Generic scraper for domains that don't need special handling yet
+// Domains with no behaviour of their own beyond their config entry.
 class GenericOlxScraper extends BaseOlxScraper {
   constructor(domain: OlxDomain, browser: Browser) {
     super(domain, browser);
-  }
-
-  protected extractListingId(url: string): import('../../core/types.js').ListingId {
-    // Most OLX domains use similar pattern: ID[alphanumeric].html
-    const match = url.match(/ID([A-Za-z0-9]+)\.html/);
-    const matchedId = match?.[1];
-    const id = matchedId ?? Date.now().toString();
-    return id as import('../../core/types.js').ListingId;
-  }
-
-  protected async findListingUrl(listingId: import('../../core/types.js').ListingId, page: import('playwright').Page): Promise<string> {
-    try {
-      // Use the domain-specific search path
-      const searchPath = this.domainConfig.domain === 'olx.pl' ? '/oferty/' : '/ads/';
-      await page.goto(`${this.domainConfig.baseUrl}${searchPath}q-${listingId}/`, {
-        waitUntil: 'networkidle',
-        timeout: 15000,
-      });
-
-      // Look for a listing card with matching ID
-      const listingLink = await page
-        .$eval(`[data-cy="l-card"] a[href*="ID${listingId}"]`, el => el.getAttribute('href'))
-        .catch(() => null);
-
-      if (listingLink) {
-        const fullUrl = new URL(listingLink, this.domainConfig.baseUrl).toString();
-        return fullUrl;
-      }
-    } catch {
-      // Search approach failed
-    }
-
-    return '';
   }
 }

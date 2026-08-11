@@ -96,6 +96,30 @@ export const setupOLXScrapingMocks = () => {
     return Promise.resolve([]);
   });
 
+  // extractListings pulls every card in one $$eval, so the mock returns the
+  // already-extracted field values rather than element handles.
+  mockPageInstance.$$eval.mockImplementation((selector: string) => {
+    if (!selector.includes('[data-cy="l-card"]')) {
+      return Promise.resolve([]);
+    }
+    return Promise.resolve([
+      {
+        title: 'iPhone 13 Pro Max',
+        price: '800€',
+        location: 'Lisboa',
+        imageUrl: 'https://example.com/image1.jpg',
+        relativeUrl: '/anuncios/iphone-13-pro-max-ID123.html',
+      },
+      {
+        title: 'Samsung Galaxy S21',
+        price: '600€',
+        location: 'Porto',
+        imageUrl: 'https://example.com/image2.jpg',
+        relativeUrl: '/anuncios/samsung-galaxy-s21-ID456.html',
+      },
+    ]);
+  });
+
   // Mock page $eval for pagination and counts
   mockPageInstance.$eval.mockImplementation((selector: string) => {
     if (selector.includes('[data-testid="total-count"]')) {
@@ -136,8 +160,11 @@ export const setupOLXScrapingMocks = () => {
     return Promise.resolve(undefined as any);
   });
 
-  // Mock page.$eval for search scenario in getListingDetails
-  const originalEval = mockPageInstance.$eval;
+  // Mock page.$eval for search scenario in getListingDetails.
+  // Capture the implementation itself, not the mock function: reading it back
+  // off the mock after the override below would return the override and
+  // recurse until the stack blows.
+  const previousEval = mockPageInstance.$eval.getMockImplementation();
   mockPageInstance.$eval.mockImplementation((selector: string, pageFunction?: any) => {
     // Handle search for listing by ID (used in getListingDetails fallback)
     if (selector.includes('[data-cy="l-card"]') && selector.includes('href')) {
@@ -152,8 +179,8 @@ export const setupOLXScrapingMocks = () => {
       }
       return Promise.reject(new Error('Element not found'));
     }
-    // Fall back to original mock implementation
-    return originalEval.getMockImplementation()?.(selector, pageFunction) || Promise.resolve('');
+    // Fall back to the implementation installed before this override
+    return previousEval?.(selector, pageFunction) || Promise.resolve('');
   });
 
   return {
@@ -169,6 +196,7 @@ export const setupEmptySearchMocks = () => {
   }
 
   mockPageInstance.$$.mockResolvedValue([]);
+  mockPageInstance.$$eval.mockResolvedValue([]);
   mockPageInstance.$eval.mockResolvedValue(0);
   mockPageInstance.$.mockResolvedValue(null);
 };

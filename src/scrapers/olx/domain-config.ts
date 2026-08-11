@@ -1,4 +1,109 @@
-import { DomainConfig, OlxDomain } from '../../core/types.js';
+import { DomainConfig, DomainSelectors, OlxDomain } from '../../core/types.js';
+
+/**
+ * Every OLX country site is the same application with a different locale, so
+ * the markup — and therefore every selector — is identical across domains.
+ * Keeping one copy means a selector change is one edit, not five.
+ */
+const COMMON_SELECTORS: DomainSelectors = {
+  search: {
+    listingCard: '[data-cy="l-card"]',
+    title: '[data-testid="ad-card-title"] h4, [data-testid="ad-card-title"] h6',
+    price: '[data-testid="ad-price"]',
+    location: '[data-testid="location-date"]',
+    image: 'img',
+    link: 'a[href]',
+    publishDate: '[data-testid="location-date"] span:last-child',
+    nextPage: '[data-testid="pagination-forward"]',
+    totalCount: '[data-testid="total-count"]',
+    noResults: '[data-cy="empty-state"]',
+  },
+  detail: {
+    title: '[data-testid="offer_title"]',
+    price: '[data-testid="ad-price-container"]',
+    description: '[data-testid="ad_description"]',
+    images: '.swiper-slide img',
+    location: '[data-testid="map-aside-section"]',
+    publishDate: '[data-testid="ad-posted-at"]',
+    seller: {
+      name: '[data-testid="user-profile-user-name"]',
+      phone: '[data-testid="phones-container"]',
+      verified: '[data-testid="trader-title"]',
+      memberSince: '[data-testid="member-since"]',
+    },
+    category: '.breadcrumb-item:last-child',
+    attributes: '[data-cy="ad-params"] li',
+  },
+};
+
+/** Ordered replacements folding a language's diacritics down to ASCII. */
+type DiacriticFolding = ReadonlyArray<readonly [RegExp, string]>;
+
+const POLISH_FOLDING: DiacriticFolding = [
+  [/ą/g, 'a'],
+  [/ć/g, 'c'],
+  [/ę/g, 'e'],
+  [/ł/g, 'l'],
+  [/ń/g, 'n'],
+  [/ó/g, 'o'],
+  [/ś/g, 's'],
+  [/ź/g, 'z'],
+  [/ż/g, 'z'],
+];
+
+const ROMANIAN_FOLDING: DiacriticFolding = [
+  [/ă/g, 'a'],
+  [/â/g, 'a'],
+  [/î/g, 'i'],
+  [/ș/g, 's'],
+  [/ț/g, 't'],
+];
+
+const fold = (value: string, folding: DiacriticFolding): string =>
+  folding.reduce((text, [pattern, replacement]) => text.replace(pattern, replacement), value);
+
+/**
+ * Folding runs before the non-ASCII strip, otherwise the strip would delete the
+ * accented characters outright and the folding would never apply.
+ */
+const slugifyQuery = (query: string, folding: DiacriticFolding): string =>
+  fold(query.toLowerCase(), folding)
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+
+const slugifyLocation = (location: string, folding: DiacriticFolding): string =>
+  fold(location.toLowerCase().replace(/\s+/g, '-'), folding);
+
+/**
+ * OLX addresses searches either as /<location>/q-<query>/ or, with no location,
+ * as <listingPath>q-<query>/ — where listingPath is the domain's "all ads" path.
+ */
+const buildSearchPath =
+  (listingPath: string, folding: DiacriticFolding = []) =>
+  (location?: string, query?: string): string => {
+    if (location) {
+      const base = `/${slugifyLocation(location, folding)}`;
+      return query ? `${base}/q-${slugifyQuery(query, folding)}/` : `${base}/`;
+    }
+    return query ? `${listingPath}q-${slugifyQuery(query, folding)}/` : listingPath;
+  };
+
+/** Identical on every domain observed so far. */
+const COMMON_URL_PARAMS = {
+  priceParams: {
+    min: 'search[filter_float_price:from]',
+    max: 'search[filter_float_price:to]',
+  },
+  sortParams: {
+    date: 'created_at:desc',
+    'price-asc': 'filter_float_price:asc',
+    'price-desc': 'filter_float_price:desc',
+  },
+  categoryParam: 'c',
+  pageParam: 'page',
+} as const;
 
 export const OLX_DOMAIN_CONFIGS: Record<OlxDomain, DomainConfig> = {
   'olx.pt': {
@@ -6,79 +111,8 @@ export const OLX_DOMAIN_CONFIGS: Record<OlxDomain, DomainConfig> = {
     baseUrl: 'https://www.olx.pt',
     currency: 'EUR',
     language: 'pt',
-    selectors: {
-      search: {
-        listingCard: '[data-cy="l-card"]',
-        title: '[data-testid="ad-card-title"] h4, [data-testid="ad-card-title"] h6',
-        price: '[data-testid="ad-price"]',
-        location: '[data-testid="location-date"]',
-        image: 'img',
-        link: 'a[href]',
-        publishDate: '[data-testid="location-date"] span:last-child',
-        nextPage: '[data-testid="pagination-forward"]',
-        totalCount: '[data-testid="total-count"]',
-        noResults: '[data-cy="empty-state"]',
-      },
-      detail: {
-        title: '[data-testid="offer_title"]',
-        price: '[data-testid="ad-price-container"]',
-        description: '[data-testid="ad_description"]',
-        images: '.swiper-slide img',
-        location: '[data-testid="map-aside-section"]',
-        publishDate: '[data-testid="ad-posted-at"]',
-        seller: {
-          name: '[data-testid="user-profile-user-name"]',
-          phone: '[data-testid="phones-container"]',
-          verified: '[data-testid="trader-title"]',
-          memberSince: '[data-testid="member-since"]',
-        },
-        category: '.breadcrumb-item:last-child',
-        attributes: '[data-cy="ad-params"] li',
-      },
-    },
-    urlPatterns: {
-      searchPath: (location?: string, query?: string) => {
-        let path = '';
-        if (location) {
-          const locationSlug = location.toLowerCase().replace(/\s+/g, '-');
-          path += `/${locationSlug}`;
-          if (query) {
-            const querySlug = query
-              .toLowerCase()
-              .replace(/[^a-z0-9\s-]/g, '')
-              .replace(/\s+/g, '-')
-              .replace(/-+/g, '-')
-              .replace(/^-|-$/g, '');
-            path += `/q-${querySlug}/`;
-          } else {
-            path += '/';
-          }
-        } else {
-          path += '/ads/';
-          if (query) {
-            const querySlug = query
-              .toLowerCase()
-              .replace(/[^a-z0-9\s-]/g, '')
-              .replace(/\s+/g, '-')
-              .replace(/-+/g, '-')
-              .replace(/^-|-$/g, '');
-            path += `q-${querySlug}/`;
-          }
-        }
-        return path;
-      },
-      priceParams: {
-        min: 'search[filter_float_price:from]',
-        max: 'search[filter_float_price:to]',
-      },
-      sortParams: {
-        date: 'created_at:desc',
-        'price-asc': 'filter_float_price:asc',
-        'price-desc': 'filter_float_price:desc',
-      },
-      categoryParam: 'c',
-      pageParam: 'page',
-    },
+    selectors: COMMON_SELECTORS,
+    urlPatterns: { searchPath: buildSearchPath('/ads/'), ...COMMON_URL_PARAMS },
   },
 
   'olx.pl': {
@@ -86,108 +120,8 @@ export const OLX_DOMAIN_CONFIGS: Record<OlxDomain, DomainConfig> = {
     baseUrl: 'https://www.olx.pl',
     currency: 'PLN',
     language: 'pl',
-    selectors: {
-      search: {
-        listingCard: '[data-cy="l-card"]',
-        title: '[data-testid="ad-card-title"] h4, [data-testid="ad-card-title"] h6',
-        price: '[data-testid="ad-price"]',
-        location: '[data-testid="location-date"]',
-        image: 'img',
-        link: 'a[href]',
-        publishDate: '[data-testid="location-date"] span:last-child',
-        nextPage: '[data-testid="pagination-forward"]',
-        totalCount: '[data-testid="total-count"]',
-        noResults: '[data-cy="empty-state"]',
-      },
-      detail: {
-        title: '[data-testid="offer_title"]',
-        price: '[data-testid="ad-price-container"]',
-        description: '[data-testid="ad_description"]',
-        images: '.swiper-slide img',
-        location: '[data-testid="map-aside-section"]',
-        publishDate: '[data-testid="ad-posted-at"]',
-        seller: {
-          name: '[data-testid="user-profile-user-name"]',
-          phone: '[data-testid="phones-container"]',
-          verified: '[data-testid="trader-title"]',
-          memberSince: '[data-testid="member-since"]',
-        },
-        category: '.breadcrumb-item:last-child',
-        attributes: '[data-cy="ad-params"] li',
-      },
-    },
-    urlPatterns: {
-      searchPath: (location?: string, query?: string) => {
-        let path = '';
-        if (location) {
-          const locationSlug = location
-            .toLowerCase()
-            .replace(/\s+/g, '-')
-            .replace(/ą/g, 'a')
-            .replace(/ć/g, 'c')
-            .replace(/ę/g, 'e')
-            .replace(/ł/g, 'l')
-            .replace(/ń/g, 'n')
-            .replace(/ó/g, 'o')
-            .replace(/ś/g, 's')
-            .replace(/ź/g, 'z')
-            .replace(/ż/g, 'z');
-          path += `/${locationSlug}`;
-          if (query) {
-            const querySlug = query
-              .toLowerCase()
-              .replace(/ą/g, 'a')
-              .replace(/ć/g, 'c')
-              .replace(/ę/g, 'e')
-              .replace(/ł/g, 'l')
-              .replace(/ń/g, 'n')
-              .replace(/ó/g, 'o')
-              .replace(/ś/g, 's')
-              .replace(/ź/g, 'z')
-              .replace(/ż/g, 'z')
-              .replace(/[^a-z0-9\s-]/g, '')
-              .replace(/\s+/g, '-')
-              .replace(/-+/g, '-')
-              .replace(/^-|-$/g, '');
-            path += `/q-${querySlug}/`;
-          } else {
-            path += '/';
-          }
-        } else {
-          path += '/oferty/';
-          if (query) {
-            const querySlug = query
-              .toLowerCase()
-              .replace(/ą/g, 'a')
-              .replace(/ć/g, 'c')
-              .replace(/ę/g, 'e')
-              .replace(/ł/g, 'l')
-              .replace(/ń/g, 'n')
-              .replace(/ó/g, 'o')
-              .replace(/ś/g, 's')
-              .replace(/ź/g, 'z')
-              .replace(/ż/g, 'z')
-              .replace(/[^a-z0-9\s-]/g, '')
-              .replace(/\s+/g, '-')
-              .replace(/-+/g, '-')
-              .replace(/^-|-$/g, '');
-            path += `q-${querySlug}/`;
-          }
-        }
-        return path;
-      },
-      priceParams: {
-        min: 'search[filter_float_price:from]',
-        max: 'search[filter_float_price:to]',
-      },
-      sortParams: {
-        date: 'created_at:desc',
-        'price-asc': 'filter_float_price:asc',
-        'price-desc': 'filter_float_price:desc',
-      },
-      categoryParam: 'c',
-      pageParam: 'page',
-    },
+    selectors: COMMON_SELECTORS,
+    urlPatterns: { searchPath: buildSearchPath('/oferty/', POLISH_FOLDING), ...COMMON_URL_PARAMS },
   },
 
   'olx.bg': {
@@ -195,79 +129,8 @@ export const OLX_DOMAIN_CONFIGS: Record<OlxDomain, DomainConfig> = {
     baseUrl: 'https://www.olx.bg',
     currency: 'BGN',
     language: 'bg',
-    selectors: {
-      search: {
-        listingCard: '[data-cy="l-card"]',
-        title: '[data-testid="ad-card-title"] h4, [data-testid="ad-card-title"] h6',
-        price: '[data-testid="ad-price"]',
-        location: '[data-testid="location-date"]',
-        image: 'img',
-        link: 'a[href]',
-        publishDate: '[data-testid="location-date"] span:last-child',
-        nextPage: '[data-testid="pagination-forward"]',
-        totalCount: '[data-testid="total-count"]',
-        noResults: '[data-cy="empty-state"]',
-      },
-      detail: {
-        title: '[data-testid="offer_title"]',
-        price: '[data-testid="ad-price-container"]',
-        description: '[data-testid="ad_description"]',
-        images: '.swiper-slide img',
-        location: '[data-testid="map-aside-section"]',
-        publishDate: '[data-testid="ad-posted-at"]',
-        seller: {
-          name: '[data-testid="user-profile-user-name"]',
-          phone: '[data-testid="phones-container"]',
-          verified: '[data-testid="trader-title"]',
-          memberSince: '[data-testid="member-since"]',
-        },
-        category: '.breadcrumb-item:last-child',
-        attributes: '[data-cy="ad-params"] li',
-      },
-    },
-    urlPatterns: {
-      searchPath: (location?: string, query?: string) => {
-        let path = '';
-        if (location) {
-          const locationSlug = location.toLowerCase().replace(/\s+/g, '-');
-          path += `/${locationSlug}`;
-          if (query) {
-            const querySlug = query
-              .toLowerCase()
-              .replace(/[^a-z0-9\s-]/g, '')
-              .replace(/\s+/g, '-')
-              .replace(/-+/g, '-')
-              .replace(/^-|-$/g, '');
-            path += `/q-${querySlug}/`;
-          } else {
-            path += '/';
-          }
-        } else {
-          path += '/ads/';
-          if (query) {
-            const querySlug = query
-              .toLowerCase()
-              .replace(/[^a-z0-9\s-]/g, '')
-              .replace(/\s+/g, '-')
-              .replace(/-+/g, '-')
-              .replace(/^-|-$/g, '');
-            path += `q-${querySlug}/`;
-          }
-        }
-        return path;
-      },
-      priceParams: {
-        min: 'search[filter_float_price:from]',
-        max: 'search[filter_float_price:to]',
-      },
-      sortParams: {
-        date: 'created_at:desc',
-        'price-asc': 'filter_float_price:asc',
-        'price-desc': 'filter_float_price:desc',
-      },
-      categoryParam: 'c',
-      pageParam: 'page',
-    },
+    selectors: COMMON_SELECTORS,
+    urlPatterns: { searchPath: buildSearchPath('/ads/'), ...COMMON_URL_PARAMS },
   },
 
   'olx.ro': {
@@ -275,96 +138,8 @@ export const OLX_DOMAIN_CONFIGS: Record<OlxDomain, DomainConfig> = {
     baseUrl: 'https://www.olx.ro',
     currency: 'RON',
     language: 'ro',
-    selectors: {
-      search: {
-        listingCard: '[data-cy="l-card"]',
-        title: '[data-testid="ad-card-title"] h4, [data-testid="ad-card-title"] h6',
-        price: '[data-testid="ad-price"]',
-        location: '[data-testid="location-date"]',
-        image: 'img',
-        link: 'a[href]',
-        publishDate: '[data-testid="location-date"] span:last-child',
-        nextPage: '[data-testid="pagination-forward"]',
-        totalCount: '[data-testid="total-count"]',
-        noResults: '[data-cy="empty-state"]',
-      },
-      detail: {
-        title: '[data-testid="offer_title"]',
-        price: '[data-testid="ad-price-container"]',
-        description: '[data-testid="ad_description"]',
-        images: '.swiper-slide img',
-        location: '[data-testid="map-aside-section"]',
-        publishDate: '[data-testid="ad-posted-at"]',
-        seller: {
-          name: '[data-testid="user-profile-user-name"]',
-          phone: '[data-testid="phones-container"]',
-          verified: '[data-testid="trader-title"]',
-          memberSince: '[data-testid="member-since"]',
-        },
-        category: '.breadcrumb-item:last-child',
-        attributes: '[data-cy="ad-params"] li',
-      },
-    },
-    urlPatterns: {
-      searchPath: (location?: string, query?: string) => {
-        let path = '';
-        if (location) {
-          const locationSlug = location
-            .toLowerCase()
-            .replace(/\s+/g, '-')
-            .replace(/ă/g, 'a')
-            .replace(/â/g, 'a')
-            .replace(/î/g, 'i')
-            .replace(/ș/g, 's')
-            .replace(/ț/g, 't');
-          path += `/${locationSlug}`;
-          if (query) {
-            const querySlug = query
-              .toLowerCase()
-              .replace(/[^a-z0-9\s-]/g, '')
-              .replace(/ă/g, 'a')
-              .replace(/â/g, 'a')
-              .replace(/î/g, 'i')
-              .replace(/ș/g, 's')
-              .replace(/ț/g, 't')
-              .replace(/\s+/g, '-')
-              .replace(/-+/g, '-')
-              .replace(/^-|-$/g, '');
-            path += `/q-${querySlug}/`;
-          } else {
-            path += '/';
-          }
-        } else {
-          path += '/ads/';
-          if (query) {
-            const querySlug = query
-              .toLowerCase()
-              .replace(/[^a-z0-9\s-]/g, '')
-              .replace(/ă/g, 'a')
-              .replace(/â/g, 'a')
-              .replace(/î/g, 'i')
-              .replace(/ș/g, 's')
-              .replace(/ț/g, 't')
-              .replace(/\s+/g, '-')
-              .replace(/-+/g, '-')
-              .replace(/^-|-$/g, '');
-            path += `q-${querySlug}/`;
-          }
-        }
-        return path;
-      },
-      priceParams: {
-        min: 'search[filter_float_price:from]',
-        max: 'search[filter_float_price:to]',
-      },
-      sortParams: {
-        date: 'created_at:desc',
-        'price-asc': 'filter_float_price:asc',
-        'price-desc': 'filter_float_price:desc',
-      },
-      categoryParam: 'c',
-      pageParam: 'page',
-    },
+    selectors: COMMON_SELECTORS,
+    urlPatterns: { searchPath: buildSearchPath('/ads/', ROMANIAN_FOLDING), ...COMMON_URL_PARAMS },
   },
 
   'olx.ua': {
@@ -372,79 +147,8 @@ export const OLX_DOMAIN_CONFIGS: Record<OlxDomain, DomainConfig> = {
     baseUrl: 'https://www.olx.ua',
     currency: 'UAH',
     language: 'uk',
-    selectors: {
-      search: {
-        listingCard: '[data-cy="l-card"]',
-        title: '[data-testid="ad-card-title"] h4, [data-testid="ad-card-title"] h6',
-        price: '[data-testid="ad-price"]',
-        location: '[data-testid="location-date"]',
-        image: 'img',
-        link: 'a[href]',
-        publishDate: '[data-testid="location-date"] span:last-child',
-        nextPage: '[data-testid="pagination-forward"]',
-        totalCount: '[data-testid="total-count"]',
-        noResults: '[data-cy="empty-state"]',
-      },
-      detail: {
-        title: '[data-testid="offer_title"]',
-        price: '[data-testid="ad-price-container"]',
-        description: '[data-testid="ad_description"]',
-        images: '.swiper-slide img',
-        location: '[data-testid="map-aside-section"]',
-        publishDate: '[data-testid="ad-posted-at"]',
-        seller: {
-          name: '[data-testid="user-profile-user-name"]',
-          phone: '[data-testid="phones-container"]',
-          verified: '[data-testid="trader-title"]',
-          memberSince: '[data-testid="member-since"]',
-        },
-        category: '.breadcrumb-item:last-child',
-        attributes: '[data-cy="ad-params"] li',
-      },
-    },
-    urlPatterns: {
-      searchPath: (location?: string, query?: string) => {
-        let path = '';
-        if (location) {
-          const locationSlug = location.toLowerCase().replace(/\s+/g, '-');
-          path += `/${locationSlug}`;
-          if (query) {
-            const querySlug = query
-              .toLowerCase()
-              .replace(/[^a-z0-9\s-]/g, '')
-              .replace(/\s+/g, '-')
-              .replace(/-+/g, '-')
-              .replace(/^-|-$/g, '');
-            path += `/q-${querySlug}/`;
-          } else {
-            path += '/';
-          }
-        } else {
-          path += '/ads/';
-          if (query) {
-            const querySlug = query
-              .toLowerCase()
-              .replace(/[^a-z0-9\s-]/g, '')
-              .replace(/\s+/g, '-')
-              .replace(/-+/g, '-')
-              .replace(/^-|-$/g, '');
-            path += `q-${querySlug}/`;
-          }
-        }
-        return path;
-      },
-      priceParams: {
-        min: 'search[filter_float_price:from]',
-        max: 'search[filter_float_price:to]',
-      },
-      sortParams: {
-        date: 'created_at:desc',
-        'price-asc': 'filter_float_price:asc',
-        'price-desc': 'filter_float_price:desc',
-      },
-      categoryParam: 'c',
-      pageParam: 'page',
-    },
+    selectors: COMMON_SELECTORS,
+    urlPatterns: { searchPath: buildSearchPath('/ads/'), ...COMMON_URL_PARAMS },
   },
 };
 

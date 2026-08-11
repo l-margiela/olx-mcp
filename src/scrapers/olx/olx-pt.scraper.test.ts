@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import type { Browser } from 'playwright';
 
 import { OLXPTScraper } from './olx-pt.scraper.js';
@@ -230,7 +230,6 @@ describe('OLXPTScraper', () => {
     });
 
     it('should handle malformed page content', async () => {
-      const _mocks = createPlaywrightMocks();
       const { mockPage } = setupOLXScrapingMocks();
 
       // Mock selectors to return null/undefined
@@ -353,22 +352,16 @@ describe('OLXPTScraper', () => {
     });
 
     it('should handle missing optional fields gracefully', async () => {
-      const _mocks = createPlaywrightMocks();
       const { mockPage } = setupOLXScrapingMocks();
 
-      // Mock some fields to return empty strings
-      mockPage.$$.mockResolvedValue([
+      // Only the required fields are present; the rest come back empty.
+      mockPage.$$eval.mockResolvedValue([
         {
-          $eval: vi.fn().mockImplementation((selector: string) => {
-            if (selector.includes('title')) {
-              return Promise.resolve('Test Title');
-            }
-            if (selector.includes('link')) {
-              return Promise.resolve('/anuncios/test-IDTEST123.html');
-            }
-            // Return empty for price, location, etc.
-            return Promise.resolve('');
-          }),
+          title: 'Test Title',
+          price: '',
+          location: '',
+          imageUrl: '',
+          relativeUrl: '/anuncios/test-IDTEST123.html',
         },
       ] as any);
 
@@ -385,29 +378,24 @@ describe('OLXPTScraper', () => {
     });
 
     it('should skip invalid listings during extraction', async () => {
-      const _mocks = createPlaywrightMocks();
       const { mockPage } = setupOLXScrapingMocks();
 
-      // Mock elements where some have missing required fields
-      mockPage.$$.mockResolvedValue([
+      // The middle card is missing both required fields.
+      mockPage.$$eval.mockResolvedValue([
         {
-          $eval: vi.fn().mockImplementation((selector: string) => {
-            if (selector.includes('title')) return Promise.resolve('Valid Title');
-            if (selector.includes('link'))
-              return Promise.resolve('/anuncios/valid-IDVALID123.html');
-            return Promise.resolve('');
-          }),
+          title: 'Valid Title',
+          price: '',
+          location: '',
+          imageUrl: '',
+          relativeUrl: '/anuncios/valid-IDVALID123.html',
         },
+        { title: '', price: '', location: '', imageUrl: '', relativeUrl: '' },
         {
-          $eval: vi.fn().mockImplementation(() => Promise.resolve('')), // No title or link
-        },
-        {
-          $eval: vi.fn().mockImplementation((selector: string) => {
-            if (selector.includes('title')) return Promise.resolve('Another Valid');
-            if (selector.includes('link'))
-              return Promise.resolve('/anuncios/another-IDVALID456.html');
-            return Promise.resolve('');
-          }),
+          title: 'Another Valid',
+          price: '',
+          location: '',
+          imageUrl: '',
+          relativeUrl: '/anuncios/another-IDVALID456.html',
         },
       ] as any);
 
@@ -465,24 +453,40 @@ describe('OLXPTScraper', () => {
     it('should handle large search results efficiently', async () => {
       const { mockPage } = setupOLXScrapingMocks();
 
-      // Mock many listing elements
-      const manyElements = Array.from({ length: 40 }, (_, i) => ({
-        $eval: vi.fn().mockImplementation((selector: string) => {
-          if (selector.includes('title')) return Promise.resolve(`Listing ${i + 1}`);
-          if (selector.includes('link'))
-            return Promise.resolve(`/anuncios/listing-ID${i + 1}.html`);
-          if (selector.includes('price')) return Promise.resolve(`${(i + 1) * 10}€`);
-          return Promise.resolve('');
-        }),
+      // Mock many listing cards
+      const manyCards = Array.from({ length: 40 }, (_, i) => ({
+        title: `Listing ${i + 1}`,
+        price: `${(i + 1) * 10}€`,
+        location: '',
+        imageUrl: '',
+        relativeUrl: `/anuncios/listing-ID${i + 1}.html`,
       }));
 
-      mockPage.$$.mockResolvedValue(manyElements as any);
+      mockPage.$$eval.mockResolvedValue(manyCards as any);
 
-      const filters = createMockSearchFilters();
-      const result = await scraper.scrape(filters);
+      const result = await scraper.scrape(createMockSearchFilters({ limit: 40 }));
 
       assertIsSuccess(result);
       expect(result.data.listings).toHaveLength(40);
+    });
+
+    it('should return no more listings than the requested limit', async () => {
+      const { mockPage } = setupOLXScrapingMocks();
+
+      mockPage.$$eval.mockResolvedValue(
+        Array.from({ length: 40 }, (_, i) => ({
+          title: `Listing ${i + 1}`,
+          price: '',
+          location: '',
+          imageUrl: '',
+          relativeUrl: `/anuncios/listing-ID${i + 1}.html`,
+        })) as any
+      );
+
+      const result = await scraper.scrape(createMockSearchFilters({ limit: 5 }));
+
+      assertIsSuccess(result);
+      expect(result.data.listings).toHaveLength(5);
     });
   });
 });
