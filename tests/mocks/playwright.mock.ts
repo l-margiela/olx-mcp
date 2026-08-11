@@ -48,7 +48,7 @@ export const setupOLXScrapingMocks = () => {
   const mockListingElements = [
     createMockElementHandle({
       $eval: vi.fn().mockImplementation((selector: string) => {
-        if (selector.includes('[data-cy="ad-card-title"]')) {
+        if (selector.includes('[data-testid="ad-card-title"]')) {
           return Promise.resolve('iPhone 13 Pro Max');
         }
         if (selector.includes('[data-testid="ad-price"]')) {
@@ -68,7 +68,7 @@ export const setupOLXScrapingMocks = () => {
     }),
     createMockElementHandle({
       $eval: vi.fn().mockImplementation((selector: string) => {
-        if (selector.includes('[data-cy="ad-card-title"]')) {
+        if (selector.includes('[data-testid="ad-card-title"]')) {
           return Promise.resolve('Samsung Galaxy S21');
         }
         if (selector.includes('[data-testid="ad-price"]')) {
@@ -121,7 +121,7 @@ export const setupOLXScrapingMocks = () => {
 
   // Mock page $ method for single element selection
   mockPageInstance.$.mockImplementation((selector: string) => {
-    if (selector.includes('[data-cy="pagination-forward"]')) {
+    if (selector.includes('[data-testid="pagination-forward"]')) {
       return Promise.resolve(createMockElementHandle() as unknown as ElementHandle);
     }
     if (selector.includes('[data-testid="trader-title"]')) {

@@ -1,7 +1,7 @@
 export const OLX_SELECTORS = {
   search: {
     listingCard: '[data-cy="l-card"]',
-    title: '[data-cy="ad-card-title"] h4',
+    title: '[data-testid="ad-card-title"] h4, [data-testid="ad-card-title"] h6',
     price: '[data-testid="ad-price"]',
     location: '[data-testid="location-date"]',
     image: 'img',
@@ -9,7 +9,7 @@ export const OLX_SELECTORS = {
     publishDate: '[data-testid="location-date"] span:last-child',
 
     // Pagination
-    nextPage: 'a[data-cy="pagination-forward"]',
+    nextPage: '[data-testid="pagination-forward"]',
     totalCount: '[data-testid="total-count"]',
 
     // No results

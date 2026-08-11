@@ -194,7 +194,7 @@ describe('OLXPLScraper', () => {
 
     it('should use Polish-specific selectors', async () => {
       const config = (scraper as any).domainConfig;
-      expect(config.selectors.search.title).toContain('h4, [data-cy="ad-card-title"] h6');
+      expect(config.selectors.search.title).toContain('h4, [data-testid="ad-card-title"] h6');
       expect(config.urlPatterns.searchPath('', 'test')).toBe('/oferty/q-test/');
     });
   });

@@ -181,8 +181,11 @@ export abstract class BaseOlxScraper extends PlaywrightScraper<SearchFilters, Se
     const totalCount = await page
       .$eval(this.domainConfig.selectors.search.totalCount, el => {
         const text = el.textContent || '';
-        const match = text.match(/(\d+)/);
-        return match && match[1] ? parseInt(match[1], 10) : 0;
+        // Domains group thousands differently ("1000", "1.000", "1 000" with a
+        // regular, non-breaking or narrow no-break space), so consume the
+        // separators as part of the number and strip them before parsing.
+        const match = text.match(/\d[\d\u0020\u00A0\u202F.,]*\d|\d/);
+        return match ? parseInt(match[0].replace(/\D/g, ''), 10) : 0;
       })
       .catch(() => 0);
 
