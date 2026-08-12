@@ -6,6 +6,18 @@ export interface IScraper<TQuery, TResult> {
   validateQuery(query: unknown): query is TQuery;
 }
 
+/**
+ * A failure that repeating the operation cannot fix — a stale selector will be
+ * just as stale on the third page load. retryOperation surfaces these
+ * immediately instead of spending the full backoff schedule on them.
+ */
+export class NonRetryableError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'NonRetryableError';
+  }
+}
+
 export abstract class PlaywrightScraper<TQuery, TResult> implements IScraper<TQuery, TResult> {
   constructor(
     protected readonly config: ScraperConfig,
@@ -46,7 +58,7 @@ export abstract class PlaywrightScraper<TQuery, TResult> implements IScraper<TQu
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
 
-        if (attempt === maxRetries) {
+        if (lastError instanceof NonRetryableError || attempt === maxRetries) {
           throw lastError;
         }
 

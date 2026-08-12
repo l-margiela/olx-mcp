@@ -16,7 +16,6 @@ const COMMON_SELECTORS: DomainSelectors = {
     publishDate: '[data-testid="location-date"] span:last-child',
     nextPage: '[data-testid="pagination-forward"]',
     totalCount: '[data-testid="total-count"]',
-    noResults: '[data-cy="empty-state"]',
   },
   detail: {
     title: '[data-testid="offer_title"]',
@@ -63,15 +62,24 @@ const fold = (value: string, folding: DiacriticFolding): string =>
   folding.reduce((text, [pattern, replacement]) => text.replace(pattern, replacement), value);
 
 /**
- * Folding runs before the non-ASCII strip, otherwise the strip would delete the
- * accented characters outright and the folding would never apply.
+ * Folding runs before punctuation is dropped, otherwise the strip would delete
+ * the accented characters outright and the folding would never apply.
+ *
+ * Letters outside the ASCII range that no folding table covers — Cyrillic on
+ * olx.ua and olx.bg — are percent-encoded rather than removed. Deleting them
+ * produced an empty "q-" slug, and OLX answers that with its unfiltered
+ * all-ads page, so every Cyrillic search silently returned arbitrary listings.
  */
-const slugifyQuery = (query: string, folding: DiacriticFolding): string =>
-  fold(query.toLowerCase(), folding)
-    .replace(/[^a-z0-9\s-]/g, '')
+const slugifyQuery = (query: string, folding: DiacriticFolding): string => {
+  const slug = fold(query.toLowerCase(), folding)
+    // Keep letters and digits of any script; drop punctuation only.
+    .replace(/[^\p{L}\p{N}\s-]/gu, '')
     .replace(/\s+/g, '-')
     .replace(/-+/g, '-')
     .replace(/^-|-$/g, '');
+
+  return /^[a-z0-9-]*$/.test(slug) ? slug : encodeURIComponent(slug);
+};
 
 const slugifyLocation = (location: string, folding: DiacriticFolding): string =>
   fold(location.toLowerCase().replace(/\s+/g, '-'), folding);

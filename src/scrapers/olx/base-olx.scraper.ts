@@ -1,5 +1,5 @@
 import { Browser, Page } from 'playwright';
-import { PlaywrightScraper } from '../base/scraper.interface.js';
+import { NonRetryableError, PlaywrightScraper } from '../base/scraper.interface.js';
 import {
   SearchFilters,
   SearchResult,
@@ -14,6 +14,8 @@ import {
 import { getDomainConfig } from './domain-config.js';
 
 export abstract class BaseOlxScraper extends PlaywrightScraper<SearchFilters, SearchResult> {
+  private static readonly URL_CACHE_LIMIT = 2000;
+
   protected readonly domainConfig: DomainConfig;
   private readonly urlCache = new Map<string, string>(); // Maps listing ID to full URL
 
@@ -59,8 +61,26 @@ export abstract class BaseOlxScraper extends PlaywrightScraper<SearchFilters, Se
         throw new Error('Operation cancelled');
       }
 
-      const listings = await this.extractListings(page, filters.limit);
-      const pagination = await this.extractPaginationInfo(page, filters.page || 1);
+      const currentPage = filters.page || 1;
+      const { listings, cardCount } = await this.extractListings(page, filters.limit);
+      const pagination = await this.extractPaginationInfo(page, currentPage, cardCount);
+
+      // The card selector going stale yields no cards at all, so extractListings
+      // cannot see it. A result count read through an unrelated selector can:
+      // "OLX says there are matches but we parsed none" is never a real state.
+      // Only meaningful on the first page — paging past the end legitimately
+      // returns nothing.
+      if (
+        listings.length === 0 &&
+        cardCount === 0 &&
+        pagination.totalCount > 0 &&
+        currentPage === 1
+      ) {
+        throw new NonRetryableError(
+          `${this.domainConfig.domain} reports ${pagination.totalCount} results but no listing ` +
+            `cards matched "${this.domainConfig.selectors.search.listingCard}" — the card selector is likely stale.`
+        );
+      }
 
       return {
         listings,
@@ -118,7 +138,10 @@ export abstract class BaseOlxScraper extends PlaywrightScraper<SearchFilters, Se
       .catch(() => {});
   }
 
-  private async extractListings(page: Page, limit?: number): Promise<Listing[]> {
+  private async extractListings(
+    page: Page,
+    limit?: number
+  ): Promise<{ listings: Listing[]; cardCount: number }> {
     const { listingCard, title, price, location, image, link } = this.domainConfig.selectors.search;
 
     // One round-trip for the whole page. Reading each field per card over
@@ -176,11 +199,17 @@ export abstract class BaseOlxScraper extends PlaywrightScraper<SearchFilters, Se
       // A listing without these two is not addressable, so it cannot be returned.
       if (!card.title || !card.relativeUrl) continue;
 
-      const url = new URL(card.relativeUrl, this.domainConfig.baseUrl).toString();
-      const id = this.extractListingId(card.relativeUrl);
+      let url: string;
+      try {
+        url = new URL(card.relativeUrl, this.domainConfig.baseUrl).toString();
+      } catch {
+        // One unparseable href (ad slots inject odd ones) must not sink the
+        // whole page of results.
+        continue;
+      }
 
-      // Cache the URL so getListingDetails can skip the lookup search.
-      this.urlCache.set(id, url);
+      const id = this.extractListingId(card.relativeUrl);
+      this.rememberUrl(id, url);
 
       listings.push({
         id,
@@ -194,20 +223,29 @@ export abstract class BaseOlxScraper extends PlaywrightScraper<SearchFilters, Se
       if (limit !== undefined && listings.length >= limit) break;
     }
 
-    // Cards on the page but none parsed means our selectors no longer match the
-    // markup. Returning [] here would be indistinguishable from a search that
+    // Cards on the page but none parsed means the per-field selectors no longer
+    // match. Returning [] would be indistinguishable from a search that
     // genuinely found nothing, which is how stale selectors ship unnoticed.
     if (cards.length > 0 && listings.length === 0) {
-      throw new Error(
+      throw new NonRetryableError(
         `Found ${cards.length} listing cards on ${this.domainConfig.domain} but extracted none — ` +
           `the "${title}" or "${link}" selector is likely stale.`
       );
     }
 
-    return listings;
+    return { listings, cardCount: cards.length };
   }
 
-  private async extractPaginationInfo(page: Page, currentPage: number) {
+  /** Bounded so a long-lived server cannot accumulate every URL it has seen. */
+  private rememberUrl(id: ListingId, url: string): void {
+    if (this.urlCache.size >= BaseOlxScraper.URL_CACHE_LIMIT) {
+      const oldest = this.urlCache.keys().next();
+      if (!oldest.done) this.urlCache.delete(oldest.value);
+    }
+    this.urlCache.set(id, url);
+  }
+
+  private async extractPaginationInfo(page: Page, currentPage: number, cardCount: number) {
     const totalCount = await page
       .$eval(this.domainConfig.selectors.search.totalCount, el => {
         const text = el.textContent || '';
@@ -220,7 +258,11 @@ export abstract class BaseOlxScraper extends PlaywrightScraper<SearchFilters, Se
       .catch(() => 0);
 
     const hasNextPage = (await page.$(this.domainConfig.selectors.search.nextPage)) !== null;
-    const itemsPerPage = 40; // OLX default across domains
+    // Derived from the page actually fetched rather than a hardcoded 40, which
+    // no longer matched what OLX serves. `limit` caps how many of a page's
+    // listings are returned and deliberately does not enter this arithmetic:
+    // totalPages counts OLX's pages, which is what `page` indexes.
+    const itemsPerPage = cardCount || 40;
     const totalPages = Math.ceil(totalCount / itemsPerPage);
 
     return {
@@ -234,7 +276,14 @@ export abstract class BaseOlxScraper extends PlaywrightScraper<SearchFilters, Se
   /** Every domain encodes the id the same way: .../slug-ID<id>.html */
   protected extractListingId(url: string): ListingId {
     const match = url.match(/ID([A-Za-z0-9]+)\.html/);
-    return (match?.[1] ?? Date.now().toString()) as ListingId;
+    if (match?.[1]) return match[1] as ListingId;
+
+    // No id in the href (promoted and redirect cards). Derive one from the URL
+    // so it stays stable across calls and unique per listing — a clock reading
+    // would be identical for every such card extracted in the same tick, and
+    // they would then overwrite each other in the URL cache.
+    const digest = Array.from(url).reduce((hash, char) => (hash * 31 + char.charCodeAt(0)) | 0, 7);
+    return `u${(digest >>> 0).toString(36)}` as ListingId;
   }
 
   async getListingDetails(listingId: ListingId, signal?: AbortSignal): Promise<Result<Listing>> {
@@ -300,22 +349,27 @@ export abstract class BaseOlxScraper extends PlaywrightScraper<SearchFilters, Se
 
   /**
    * Fallback for an id that was never seen by a search: look it up through the
-   * domain's own listing search. The id is appended raw because it is
-   * case-sensitive and must not be slugified.
+   * domain's own listing search. The id is encoded rather than slugified, since
+   * it is case-sensitive.
    */
   protected async findListingUrl(listingId: ListingId, page: Page): Promise<string> {
     const listingPath = this.domainConfig.urlPatterns.searchPath();
+    // The id reaches us from the client, so it is encoded for the path and
+    // matched as a literal in the selector rather than spliced into either.
+    const safeId = encodeURIComponent(listingId);
 
     try {
-      await page.goto(`${this.domainConfig.baseUrl}${listingPath}q-${listingId}/`, {
+      await page.goto(`${this.domainConfig.baseUrl}${listingPath}q-${safeId}/`, {
         waitUntil: 'networkidle',
         timeout: 15000,
       });
 
       const href = await page
-        .$eval(
-          `${this.domainConfig.selectors.search.listingCard} a[href*="ID${listingId}"]`,
-          el => el.getAttribute('href') || ''
+        .$$eval(
+          `${this.domainConfig.selectors.search.listingCard} a[href]`,
+          (anchors, needle) =>
+            anchors.map(a => a.getAttribute('href') || '').find(h => h.includes(needle)) || '',
+          `ID${listingId}`
         )
         .catch(() => '');
 

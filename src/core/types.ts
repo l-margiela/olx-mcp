@@ -44,7 +44,6 @@ export interface DomainSelectors {
     readonly publishDate: string;
     readonly nextPage: string;
     readonly totalCount: string;
-    readonly noResults: string;
   };
   readonly detail: {
     readonly title: string;

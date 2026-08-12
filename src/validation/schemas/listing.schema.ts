@@ -25,7 +25,16 @@ export type SearchListingsArgs = z.infer<typeof SearchListingsArgsSchema>;
 
 export const GetListingDetailsArgsSchema = z.object({
   domain: z.enum(['olx.pt', 'olx.pl', 'olx.bg', 'olx.ro', 'olx.ua']),
-  listingId: z.string().min(1),
+  // Rejects path and selector metacharacters (quotes, slashes, whitespace, ?, #)
+  // that have no place in an OLX id. The id is also encoded before it reaches a
+  // URL and passed as data to DOM queries; this is the outer guard.
+  listingId: z
+    .string()
+    .min(1)
+    .regex(
+      /^[A-Za-z0-9._-]+$/,
+      'listingId may contain only letters, digits, dot, underscore, dash'
+    ),
   includeImages: z.boolean().default(false),
   includeSellerInfo: z.boolean().default(true),
 });
