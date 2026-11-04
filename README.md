@@ -79,6 +79,46 @@ Use this config for development:
 }
 ```
 
+### 🌐 Alternative: Streamable HTTP transport
+
+By default the server talks over STDIO, so each client starts its own server process and
+its own browser. If you'd rather run one long-lived server that several clients share,
+for example in a separate container, start it with the
+[Streamable HTTP](https://modelcontextprotocol.io/specification/2025-06-18/basic/transports#streamable-http)
+transport:
+
+```bash
+npx olx-mcp --transport http --port 3000
+# MCP endpoint: http://127.0.0.1:3000/mcp   health check: http://127.0.0.1:3000/health
+```
+
+| Flag | Env variable | Default |
+|------|--------------|---------|
+| `--transport stdio\|http` | `OLX_MCP_TRANSPORT` | `stdio` |
+| `--host` | `OLX_MCP_HOST` | `127.0.0.1` |
+| `--port` | `OLX_MCP_PORT` | `3000` |
+| `--allowed-hosts` (comma-separated `host:port`) | `OLX_MCP_ALLOWED_HOSTS` | loopback addresses when bound to loopback |
+
+The server runs in stateless mode: every request is independent and all clients share
+one browser instance. It has no authentication. Bound to `127.0.0.1` (the default),
+it only accepts requests whose `Host` header is a loopback address, which protects
+against DNS rebinding. If you bind it to another interface (e.g. `--host 0.0.0.0` inside
+a container), keep it on a private network and set `--allowed-hosts` to the names
+clients use, e.g. `--allowed-hosts olx-mcp:3000`.
+
+Client configuration (e.g. Claude Code `.mcp.json`):
+
+```json
+{
+  "mcpServers": {
+    "olx-mcp": {
+      "type": "http",
+      "url": "http://127.0.0.1:3000/mcp"
+    }
+  }
+}
+```
+
 ## Usage
 
 Once configured, you can use the following tools in your MCP client:

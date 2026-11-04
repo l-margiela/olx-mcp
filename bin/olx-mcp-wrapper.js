@@ -24,7 +24,7 @@ if (process.argv.includes('--help') || process.argv.includes('-h')) {
 // No browser installation needed - handled by postinstall script
 
 // Spawn the actual server process
-const child = spawn('node', [serverPath], {
+const child = spawn('node', [serverPath, ...process.argv.slice(2)], {
   stdio: 'inherit',
   detached: false
 });
