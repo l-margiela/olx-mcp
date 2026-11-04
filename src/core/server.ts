@@ -21,10 +21,21 @@ export class OLXMCPServer {
   private scraperFactory?: OlxScraperFactory | undefined;
 
   constructor(private readonly config: ServerConfig) {
-    this.server = new Server(
+    this.server = this.createProtocolServer();
+  }
+
+  /**
+   * Create a new MCP protocol server bound to this instance's tools.
+   *
+   * An MCP `Server` can be connected to only one transport at a time. The STDIO
+   * entrypoint uses the default instance (see `connect`), while the HTTP transport
+   * creates one per request so concurrent clients share the same browser and tools.
+   */
+  createProtocolServer(): Server {
+    const server = new Server(
       {
-        name: config.name,
-        version: config.version,
+        name: this.config.name,
+        version: this.config.version,
       },
       {
         capabilities: {
@@ -33,7 +44,8 @@ export class OLXMCPServer {
       }
     );
 
-    this.setupHandlers();
+    this.setupHandlers(server);
+    return server;
   }
 
   async initialize(): Promise<void> {
@@ -60,8 +72,8 @@ export class OLXMCPServer {
       .register(new GetListingDetailsTool(this.scraperFactory));
   }
 
-  private setupHandlers(): void {
-    this.server.setRequestHandler(ListToolsRequestSchema, async () => ({
+  private setupHandlers(server: Server): void {
+    server.setRequestHandler(ListToolsRequestSchema, async () => ({
       tools: this.registry.getAllTools().map(tool => ({
         name: tool.name,
         description: tool.description,
@@ -69,7 +81,7 @@ export class OLXMCPServer {
       })),
     }));
 
-    this.server.setRequestHandler(CallToolRequestSchema, async request => {
+    server.setRequestHandler(CallToolRequestSchema, async request => {
       const { name, arguments: args } = request.params;
 
       const tool = this.registry.get(name);
